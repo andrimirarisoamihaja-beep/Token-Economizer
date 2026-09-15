@@ -4,4 +4,4 @@ def test_addition_correcte():
     assert addition(2, 3) == 5  # Ce test va réussir
 
 def test_addition_erreur():
-    assert addition(2, 2) == 5  # Ce test va échouer exprès pour essayer
+    assert addition(2, 2) == 4  # Remplacez 5 par 4
