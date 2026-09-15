@@ -1,1 +1,1 @@
-
+![Tests](https://github.com/andrimirarisoamihaja-beep/teste-CICD/actions/workflows/verification.yml/badge.svg)
