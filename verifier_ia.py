@@ -5,7 +5,7 @@ from groq import Groq
 
 
 def demander_explication_ia(erreurs: str):
-    """Envoie l'erreur à Groq (Llama 3) et affiche son explication."""
+    """Envoie l'erreur à Groq (gpt-oss-120b) et affiche son explication."""
     api_key = os.getenv("GROQ_API_KEY")
 
     if not api_key:
@@ -17,7 +17,7 @@ def demander_explication_ia(erreurs: str):
     client = Groq(api_key=api_key)
 
     print(
-        "\n⚡ L'IA (Groq - Llama 3.3) analyse vos erreurs à toute vitesse...\n"
+        "\n⚡ L'IA (Groq - gpt-oss-120b) analyse vos erreurs à toute vitesse...\n"
     )
 
     prompt = f"""
@@ -37,7 +37,7 @@ def demander_explication_ia(erreurs: str):
     try:
         chat_completion = client.chat.completions.create(
             messages=[{"role": "user", "content": prompt}],
-            model="llama-3.3-70b-versatile",  # Modèle gratuit et très puissant
+            model="openai/gpt-oss-120b",  # Modèle gratuit et très puissant
             temperature=0.2,
         )
 
