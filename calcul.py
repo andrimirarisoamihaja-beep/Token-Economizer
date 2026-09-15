@@ -28,4 +28,4 @@ class Calculatrice:
         # mais ici on retourne du texte (str) avec le symbole "%" !
         resultat_incorrect: str = f"{moyenne:.2f}%"
 
-        return resultat_incorrect  # Mypy va bloquer ici !
+        return moyenne
