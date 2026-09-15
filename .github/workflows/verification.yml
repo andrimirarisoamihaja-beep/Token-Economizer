@@ -1,0 +1,24 @@
+name: Test Automatique Python
+
+on: [push, pull_request]
+
+jobs:
+  verification-code:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Recupérer le code source
+        uses: actions/checkout@v4
+
+      - name: Installer Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Installer les outils de test
+        run: pip install mypy pytest
+
+      - name: Execution de mypy (Verification des types)
+        run: python -m mypy calcul.py
+
+      - name: Execution de pytest (Tests unitaires)
+        run: python -m pytest
