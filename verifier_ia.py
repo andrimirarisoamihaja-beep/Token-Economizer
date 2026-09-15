@@ -5,7 +5,7 @@ from groq import Groq
 
 
 def demander_explication_ia(erreurs: str):
-    """Envoie l'erreur à Groq (gpt-oss-120b) et affiche son explication."""
+    """Envoie l'erreur à Groq et affiche l'emplacement exact et la solution."""
     api_key = os.getenv("GROQ_API_KEY")
 
     if not api_key:
@@ -16,32 +16,30 @@ def demander_explication_ia(erreurs: str):
 
     client = Groq(api_key=api_key)
 
-    print(
-        "\n⚡ L'IA (Groq - gpt-oss-120b) analyse vos erreurs à toute vitesse...\n"
-    )
+    print("\n⚡ L'IA (Groq) génère la localisation et la solution...\n")
 
+    # Prompt exigeant l'emplacement exact
     prompt = f"""
-    Tu es un assistant professeur de Python bienveillant et expert.
-    Voici des erreurs détectées par Mypy ou Pytest :
+    Analyse ces erreurs Python (Mypy/Pytest) et fais une synthèse ULTRA COURTE et directe.
 
     ```text
     {erreurs}
     ```
 
-    Consignes :
-    1. Explique l'erreur en français simple (1 ou 2 phrases max).
-    2. Explique POURQUOI cette erreur s'est produite.
-    3. Donne le code exact pour la corriger.
+    Respecte STRICTEMENT ce format (exactement 3 lignes, sans introduction ni conclusion) :
+    📍 Emplacement : [Nom du fichier] -> [Nom de la fonction ou Numéro de ligne]
+    ❌ Problème : [1 phrase décrivant l'erreur]
+    💡 Correction : [Le code exact ou l'action précise à effectuer pour corriger]
     """
 
     try:
         chat_completion = client.chat.completions.create(
             messages=[{"role": "user", "content": prompt}],
-            model="openai/gpt-oss-120b",  # Modèle gratuit et très puissant
-            temperature=0.2,
+            model="openai/gpt-oss-120b",
+            temperature=0.1,
         )
 
-        print("💡 EXPLICATION DE L'IA (Groq) :")
+        print("💡 SYNTHÈSE IA :")
         print("--------------------------------------------------")
         print(chat_completion.choices[0].message.content)
         print("--------------------------------------------------")
