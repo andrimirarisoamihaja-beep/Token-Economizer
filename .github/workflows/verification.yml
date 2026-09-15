@@ -13,9 +13,9 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-
-      - name: Installer les outils (mypy, pytest, groq)
-        run: pip install mypy pytest groq
+          
+      - name: Installer les outils
+        run: pip install -r requirements.txt
 
       - name: Exécuter la vérification avec Groq IA
         env:
