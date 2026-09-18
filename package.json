@@ -1,0 +1,27 @@
+{
+  "name": "teste",
+  "version": "1.0.0",
+  "description": "![Tests](https://github.com/andrimirarisoamihaja-beep/teste-CICD/actions/workflows/verification.yml/badge.svg)",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/andrimirarisoamihaja-beep/teste-CICD.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/andrimirarisoamihaja-beep/teste-CICD/issues"
+  },
+  "homepage": "https://github.com/andrimirarisoamihaja-beep/teste-CICD#readme",
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.10.0",
+    "globals": "^17.12.0",
+    "jest": "^30.5.1",
+    "typescript-eslint": "^8.70.0"
+  }
+}
