@@ -12,7 +12,6 @@ if sys.platform == "win32":
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
     sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
 
-# Charger les variables d'environnement
 load_dotenv()
 
 # -------------------- CONFIGURATION --------------------
@@ -85,6 +84,113 @@ def has_npm_test_script(dossier: str) -> bool:
         return False
 
 
+def commande_disponible(nom: str) -> bool:
+    """Vérifie si une commande existe dans le PATH."""
+    code, _ = executer_commande(f"{nom} -version")
+    if code == 0:
+        return True
+    # javac / java renvoient parfois un code non nul mais existent quand même
+    code2, sortie2 = executer_commande(f"where {nom}" if sys.platform == "win32" else f"which {nom}")
+    return code2 == 0 and bool(sortie2.strip())
+
+
+def collecter_fichiers_java(cible: str) -> list[str]:
+    """Retourne la liste des fichiers .java à analyser."""
+    if os.path.isfile(cible) and cible.lower().endswith(".java"):
+        return [os.path.abspath(cible)]
+
+    fichiers: list[str] = []
+    if os.path.isdir(cible):
+        for root, dirs, files in os.walk(cible):
+            # Ignorer dossiers inutiles
+            dirs[:] = [
+                d
+                for d in dirs
+                if d
+                not in {
+                    ".git",
+                    "node_modules",
+                    ".venv",
+                    "target",
+                    "build",
+                    "out",
+                    "__pycache__",
+                }
+            ]
+            for name in files:
+                if name.lower().endswith(".java"):
+                    fichiers.append(os.path.join(root, name))
+    return fichiers
+
+def analyser_java(cible: str) -> str:
+    """Analyse Java : Compilation via Maven/Gradle si présent, sinon javac."""
+    erreurs = ""
+    racine = (
+        cible
+        if os.path.isdir(cible)
+        else os.path.dirname(os.path.abspath(cible)) or "."
+    )
+
+    # Chercher la racine du projet s'il y a un pom.xml au-dessus
+    dossier_parent = racine
+    for _ in range(5):  # Remonte jusqu'à 5 dossiers au-dessus
+        if os.path.isfile(os.path.join(dossier_parent, "pom.xml")) or os.path.isfile(
+            os.path.join(dossier_parent, "build.gradle")
+        ):
+            racine = dossier_parent
+            break
+        parent = os.path.dirname(dossier_parent)
+        if parent == dossier_parent:
+            break
+        dossier_parent = parent
+
+    pom = os.path.join(racine, "pom.xml")
+    gradle = os.path.join(racine, "build.gradle")
+    gradle_kts = os.path.join(racine, "build.gradle.kts")
+
+    # 1. Si projet MAVEN : on compile avec Maven (charge toutes les dépendances .jar)
+    if os.path.isfile(pom) and commande_disponible("mvn"):
+        print("Projet Maven détecté. Compilation avec Maven...")
+        code_mvn, sortie_mvn = executer_commande(
+            f'mvn -f "{pom}" test-compile -q',
+            timeout=max(TIMEOUT_SECONDES, 180),
+        )
+        if code_mvn != 0:
+            erreurs += f"--- ERREURS DE COMPILATION (MAVEN) ---\n{sortie_mvn}\n"
+        return erreurs
+
+    # 2. Si projet GRADLE : on compile avec Gradle
+    if (os.path.isfile(gradle) or os.path.isfile(gradle_kts)):
+        print("Projet Gradle détecté. Compilation avec Gradle...")
+        gradlew = os.path.join(
+            racine, "gradlew.bat" if sys.platform == "win32" else "gradlew"
+        )
+        cmd = f'"{gradlew}" -p "{racine}" testClasses -q' if os.path.isfile(gradlew) else f'gradle -p "{racine}" testClasses -q'
+        code_gr, sortie_gr = executer_commande(cmd, timeout=max(TIMEOUT_SECONDES, 180))
+        if code_gr != 0:
+            erreurs += f"--- ERREURS DE COMPILATION (GRADLE) ---\n{sortie_gr}\n"
+        return erreurs
+
+    # 3. Mode secours : Compilation directe avec javac (pour fichiers isolés sans Maven/Gradle)
+    fichiers = collecter_fichiers_java(cible)
+    if not fichiers:
+        return "--- JAVA ---\nAucun fichier .java trouvé.\n"
+
+    if not commande_disponible("javac"):
+        return "--- JAVA ---\nERREUR : 'javac' introuvable dans le PATH.\n"
+
+    liste_fichiers = " ".join(f'"{f}"' for f in fichiers)
+    out_dir = os.path.join(racine, ".verifier_java_out")
+    
+    code_javac, sortie_javac = executer_commande(
+        f'javac -Xlint:all -encoding UTF-8 -d "{out_dir}" {liste_fichiers}'
+    )
+
+    if code_javac != 0:
+        erreurs += f"--- COMPILATION JAVA (JAVAC) ---\n{sortie_javac}\n"
+
+    return erreurs
+
 def demander_explication_ia(erreurs: str, langage: str) -> None:
     """Consulte l'IA Groq pour expliquer et corriger les erreurs."""
     api_key = os.getenv("GROQ_API_KEY")
@@ -125,7 +231,9 @@ def main() -> None:
     if len(sys.argv) > 1:
         cible = sys.argv[1]
     else:
-        saisie = input("Entrez le fichier ou dossier a verifier (ex: main.js, app.py) : ").strip()
+        saisie = input(
+            "Entrez le fichier ou dossier a verifier (ex: main.js, app.py, Main.java) : "
+        ).strip()
         cible = saisie if saisie else "main.js"
 
     if not os.path.exists(cible):
@@ -134,11 +242,31 @@ def main() -> None:
 
     # Détection du langage
     extension = os.path.splitext(cible)[1].lower()
+    est_java = extension == ".java"
     est_typescript = extension in [".ts", ".tsx"]
     est_javascript = extension in [".js", ".jsx", ".mjs", ".cjs"] or est_typescript
 
-    if os.path.isdir(cible) and os.path.exists(os.path.join(cible, "package.json")):
-        est_javascript = True
+    if os.path.isdir(cible):
+        # Un dossier peut être multi-langage : on priorise selon le contenu
+        contient_java = any(
+            f.lower().endswith(".java") for f in collecter_fichiers_java(cible)
+        )
+        if os.path.exists(os.path.join(cible, "package.json")):
+            est_javascript = True
+            est_java = False
+        elif (
+            os.path.exists(os.path.join(cible, "pom.xml"))
+            or os.path.exists(os.path.join(cible, "build.gradle"))
+            or os.path.exists(os.path.join(cible, "build.gradle.kts"))
+            or contient_java
+        ):
+            est_java = True
+            est_javascript = False
+
+    # Fichier unique .java
+    if extension == ".java":
+        est_java = True
+        est_javascript = False
 
     racine_projet = (
         cible if os.path.isdir(cible) else os.path.dirname(os.path.abspath(cible)) or "."
@@ -148,7 +276,12 @@ def main() -> None:
     langage_nom = ""
 
     # -------------------- VÉRIFICATIONS --------------------
-    if est_javascript:
+    if est_java:
+        langage_nom = "Java"
+        print(f"Vérification Java sur : '{cible}' (Compilation, Tests)...\n")
+        erreurs_detectees += analyser_java(cible)
+
+    elif est_javascript:
         langage_nom = "TypeScript" if est_typescript else "JavaScript"
         print(f"Vérification {langage_nom} sur : '{cible}' (Qualité, Types, Tests)...\n")
 
@@ -162,15 +295,21 @@ def main() -> None:
         option_config = "" if config_existante else f'--config "{CONFIG_ESLINT_DEFAUT}"'
 
         # 1. ESLint
-        code_eslint, sortie_eslint = executer_commande(f'npx --yes eslint {option_config} "{cible}"')
+        code_eslint, sortie_eslint = executer_commande(
+            f'npx --yes eslint {option_config} "{cible}"'
+        )
         if code_eslint != 0:
             erreurs_detectees += f"--- QUALITE DU CODE (ESLINT) ---\n{sortie_eslint}\n"
 
         # 2. TypeScript
         if est_typescript:
-            code_tsc, sortie_tsc = executer_commande(f'npx --yes tsc "{cible}" --noEmit --allowJs')
+            code_tsc, sortie_tsc = executer_commande(
+                f'npx --yes tsc "{cible}" --noEmit --allowJs'
+            )
             if code_tsc != 0:
-                erreurs_detectees += f"--- ERREURS DE TYPE (TYPESCRIPT) ---\n{sortie_tsc}\n"
+                erreurs_detectees += (
+                    f"--- ERREURS DE TYPE (TYPESCRIPT) ---\n{sortie_tsc}\n"
+                )
 
         # 3. Tests
         if has_npm_test_script(racine_projet):
@@ -196,7 +335,9 @@ def main() -> None:
 
         # 3. Pytest
         dossier_test = cible if os.path.isdir(cible) else racine_projet
-        code_pytest, sortie_pytest = executer_commande(f'python -m pytest "{dossier_test}"')
+        code_pytest, sortie_pytest = executer_commande(
+            f'python -m pytest "{dossier_test}"'
+        )
         if code_pytest != 0 and "no tests ran" not in sortie_pytest:
             erreurs_detectees += f"--- TESTS UNITAIRES (PYTEST) ---\n{sortie_pytest}\n"
 
@@ -204,11 +345,11 @@ def main() -> None:
     if not erreurs_detectees:
         print(f"SUCCES : Le fichier {cible} est propre et sans erreur.")
         sys.exit(0)
-    else:
-        print("PROBLEMES DETECTES :\n")
-        print(erreurs_detectees)
-        demander_explication_ia(erreurs_detectees, langage_nom)
-        sys.exit(1)
+
+    print("PROBLEMES DETECTES :\n")
+    print(erreurs_detectees)
+    demander_explication_ia(erreurs_detectees, langage_nom)
+    sys.exit(1)
 
 
 if __name__ == "__main__":

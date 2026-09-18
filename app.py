@@ -45,7 +45,7 @@ DOSSIERS_EXCLUS = {
     ".streamlit",
 }
 
-EXTENSIONS_OK = (".py", ".js", ".ts", ".jsx", ".tsx", ".mjs", ".cjs")
+EXTENSIONS_OK = (".py", ".js", ".ts", ".jsx", ".tsx", ".mjs", ".cjs", ".java")
 
 
 def lister_contenu(chemin: str):
@@ -169,10 +169,9 @@ with col1:
                                 st.rerun()
         else:
             st.caption(
-                "Aucun fichier .py / .js / .ts dans ce dossier. "
-                "Vous pouvez analyser le dossier entier via le bouton 'Analyser ce dossier'."
+                "Aucun fichier .py / .js / .ts / .java dans ce dossier. "
+                "Vous pouvez analyser le dossier entier via le bouton 📌."
             )
-
         fichier_cible = st.session_state.selected_target
 
     else:
