@@ -1,4 +1,5 @@
 import pytest
+
 from calcul import Calculatrice
 
 

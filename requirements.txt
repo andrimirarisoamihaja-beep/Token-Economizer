@@ -1,5 +1,6 @@
+streamlit
+python-dotenv
+groq
 ruff
 mypy
 pytest
-groq
-openai

@@ -4,9 +4,13 @@ import sys
 
 def executer_commande(commande):
     resultat = subprocess.run(
-        commande, capture_output=True, text=True, shell=True
+        commande,
+        capture_output=True,
+        text=True,
+        shell=True,
+        check=False   # <-- ajout obligatoire
     )
-    return resultat.returncode, resultat.stdout + resultat.stderr
+    return resultat
 
 
 print("=" * 60)
