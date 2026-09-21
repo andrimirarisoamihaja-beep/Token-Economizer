@@ -4,11 +4,11 @@ cd /d "%~dp0"
 title Verificateur de Code - Lancement
 
 echo ============================================
-echo   VERIFICATEUR DE CODE (Streamlit + IA)
+echo   VERIFICATEUR DE CODE (Python, JS, TS, Java)
 echo ============================================
 echo.
 
-REM --- Verifier Python ---
+REM --- 1. Verifier Python ---
 python --version >nul 2>&1
 if errorlevel 1 (
     echo [ERREUR] Python introuvable. Lancez d'abord installer.bat
@@ -16,7 +16,7 @@ if errorlevel 1 (
     exit /b 1
 )
 
-REM --- Verifier / creer le venv ---
+REM --- 2. Verifier / activer le venv ---
 if not exist ".venv\Scripts\activate.bat" (
     echo [INFO] Environnement virtuel manquant. Lancement de l'installation...
     call installer.bat
@@ -25,57 +25,57 @@ if not exist ".venv\Scripts\activate.bat" (
 
 call .venv\Scripts\activate.bat
 
-REM --- Verifier les packages essentiels ---
+REM --- 3. Verifier que Streamlit est bien installe ---
 python -c "import streamlit, dotenv, groq" >nul 2>&1
 if errorlevel 1 (
-    echo [INFO] Dependances manquantes. Installation...
+    echo [INFO] Dependances manquantes. Installation en cours...
     python -m pip install -r requirements.txt
 )
 
-REM --- Gestion de la cle API Groq ---
-set "NEED_KEY=0"
-
-if not exist ".env" (
-    set "NEED_KEY=1"
-) else (
-    findstr /B /C:"GROQ_API_KEY=" ".env" >nul 2>&1
-    if errorlevel 1 (
-        set "NEED_KEY=1"
-    ) else (
-        REM Verifie que la cle n'est pas vide
-        for /f "tokens=1,* delims==" %%a in ('findstr /B /C:"GROQ_API_KEY=" ".env"') do (
-            if "%%b"=="" set "NEED_KEY=1"
-            if "%%b"=="votre_vraie_cle_api_groq_ici" set "NEED_KEY=1"
-        )
-    )
+REM --- 4. Verifications optionnelles ---
+node --version >nul 2>&1
+if errorlevel 1 (
+    echo [ATTENTION] Node.js non detecte.
 )
 
-if "%NEED_KEY%"=="1" (
-    echo.
-    echo [CONFIGURATION] Aucune cle API Groq valide trouvee.
-    echo.
-    echo 1. Allez sur https://console.groq.com/keys
-    echo 2. Creez un compte / connectez-vous
-    echo 3. Generez une cle API
-    echo.
-    set /p GROQ_KEY=Collez votre cle API Groq ici : 
+javac -version >nul 2>&1
+if errorlevel 1 (
+    echo [ATTENTION] JDK Java non detecte.
+)
 
-    if "%GROQ_KEY%"=="" (
-        echo [ERREUR] Aucune cle saisie. Abandon.
-        pause
-        exit /b 1
-    )
+REM --- 5. Verification du fichier .env ---
+if not exist ".env" goto DEMANDER_CLE
 
+findstr /B /C:"GROQ_API_KEY=" ".env" >nul 2>&1
+if errorlevel 1 goto DEMANDER_CLE
+
+goto LANCER_APP
+
+:DEMANDER_CLE
+echo.
+echo ----------------------------------------------------
+echo [CONFIGURATION] Aucune cle API Groq trouvee.
+echo ----------------------------------------------------
+echo 1. Allez sur https://console.groq.com/keys
+echo 2. Creez un compte gratuit et copiez votre cle API
+echo.
+set /p GROQ_KEY=Collez votre cle API Groq ici : 
+
+if "%GROQ_KEY%"=="" (
+    echo.
+    echo [ATTENTION] Aucune cle saisie. L'analyse fonctionnera sans IA.
+    echo.
+) else (
     echo GROQ_API_KEY=%GROQ_KEY%> ".env"
     echo.
     echo [OK] Cle enregistree dans le fichier .env
     echo.
 )
 
-REM --- Lancer Streamlit ---
+:LANCER_APP
 echo [INFO] Demarrage de l'interface web...
-echo [INFO] Votre navigateur va s'ouvrir automatiquement.
-echo [INFO] Pour arreter : fermez cette fenetre ou faites Ctrl+C
+echo [INFO] Le navigateur va s'ouvrir automatiquement.
+echo [INFO] Pour arreter l'application : fermez cette fenetre.
 echo.
 
 set PYTHONIOENCODING=utf-8
